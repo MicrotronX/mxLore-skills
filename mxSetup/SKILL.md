@@ -11,6 +11,9 @@ argument-hint: "<api-key> | --update"
 > ⚡ **!Python !jq !sed fuer Datei-Operationen.** Nur Write/Read/Edit-Tools + Bash fuer `claude mcp` und `curl`.
 > ⚡ **Bash: Einzeilig.** !Mehrzeiler !Heredocs !Newlines in Befehlen.
 
+## Voraussetzungen
+- **Node.js** — Erforderlich fuer 5 von 8 Hooks (Orchestrate, Recall-Gate, Recall-Outcome). Ohne Node.js funktioniert die Session nur eingeschraenkt (kein State-Tracking, kein Recall-Gate). Installation: https://nodejs.org/
+
 ## Erstinstallation (mit API-Key)
 
 ### Phase 1: MCP-Verbindung
@@ -48,11 +51,13 @@ rm -rf /tmp/mxLore-skills /tmp/mxLore-skills.zip
 
 ### Phase 3: Proxy installieren
 
-1. **Admin-URL:** Aus mx_ping `admin_port` → `http://<host>:<admin_port>/api/download/proxy`
-   Falls kein admin_port: Server-URL Port+1 (8080→8081)
+1. **Admin-URL bauen:** Aus mx_ping `admin_port` + `proxy_download_path`.
+   ⚡ Host = gleicher Host wie MCP-Verbindung (aus Phase 1 Server-URL). Server kennt seinen externen Zugriffsweg nicht (IIS Reverse Proxy).
+   → `http://<MCP-HOST>:<admin_port><proxy_download_path>`
+   Falls kein admin_port: Server-URL Port+1 (8080→8081). Falls admin_port nicht erreichbar: Warnung, Proxy-Update ueberspringen.
 2. Download:
 ```bash
-curl -f -o ~/.claude/mxMCPProxy.exe "http://<host>:<admin_port>/api/download/proxy"
+curl -f -o ~/.claude/mxMCPProxy.exe "http://<MCP-HOST>:<admin_port>/api/download/proxy"
 ```
 3. Dateigroesse pruefen (>100KB). Falls kleiner: Warnung, skip Proxy.
 4. Proxy-INI erzeugen (Write-Tool → `~/.claude/mxMCPProxy.ini`):
@@ -93,14 +98,22 @@ claude mcp add -s user mxai-knowledge -- "<HOME>/.claude/mxMCPProxy.exe"
 
 **5b. Hooks** — Jeden Hook-Block pruefen. Falls Eintrag fehlt, hinzufuegen. Falls vorhanden, nicht duplizieren.
 
-| Event | Hooks (in Reihenfolge) |
-|-------|----------------------|
-| `SessionStart` | `node ~/.claude/hooks/orchestrate-reconcile.js` (2000ms) + `node ~/.claude/hooks/orchestrate-status.js` (2000ms) |
-| `UserPromptSubmit` | `bash ~/.claude/hooks/agent_inbox_check.sh` (2000ms) + `node ~/.claude/hooks/orchestrate-status.js` (2000ms) |
-| `Stop` | `node ~/.claude/hooks/orchestrate-step-check.js` (3000ms) |
-| `PreToolUse` (matcher: `Edit\|Write`) | `node ~/.claude/hooks/recall-gate.js` (2000ms) |
-| `PostToolUse` (matcher: `Edit\|Write`) | `node ~/.claude/hooks/recall-outcome-hook.js` (2000ms) |
-| `PreCompact` | prompt: (Auto-ADR + /mxSave, siehe unten) |
+⚡ **Node.js-Check VOR Hook-Installation:**
+```bash
+node --version 2>/dev/null
+```
+Falls `node` nicht gefunden: Warnung anzeigen:
+> "Node.js nicht gefunden. 5 von 8 Hooks (Orchestrate, Recall-Gate, Recall-Outcome) werden ohne Node.js nicht funktionieren. Session laeuft eingeschraenkt (kein State-Tracking, kein Recall-Gate). Installation: https://nodejs.org/"
+→ Nur die Bash-Hooks und PreCompact-Prompt installieren, JS-Hooks ueberspringen.
+
+| Event | Hooks (in Reihenfolge) | Braucht |
+|-------|----------------------|---------|
+| `SessionStart` | `node ~/.claude/hooks/orchestrate-reconcile.js` (2000ms) + `node ~/.claude/hooks/orchestrate-status.js` (2000ms) | Node.js |
+| `UserPromptSubmit` | `bash ~/.claude/hooks/agent_inbox_check.sh` (2000ms) + `node ~/.claude/hooks/orchestrate-status.js` (2000ms) | Bash + Node.js |
+| `Stop` | `node ~/.claude/hooks/orchestrate-step-check.js` (3000ms) | Node.js |
+| `PreToolUse` (matcher: `Edit\|Write`) | `node ~/.claude/hooks/recall-gate.js` (2000ms) | Node.js |
+| `PostToolUse` (matcher: `Edit\|Write`) | `node ~/.claude/hooks/recall-outcome-hook.js` (2000ms) | Node.js |
+| `PreCompact` | prompt: (Auto-ADR + /mxSave, siehe unten) | — |
 
 **PreCompact prompt** (exakt uebernehmen):
 ```
