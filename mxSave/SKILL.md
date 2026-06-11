@@ -18,7 +18,7 @@ Save agent. Persists project state for seamless session continuation.
 **Phased sequential-with-parallel** (do NOT collapse into a single fan-out; race + data-dependency hazards):
 
 1. **Main:** Init → Steps 1, 2 (settings + CLAUDE.md/status.md + zombie check).
-2. **Parallel phase A:** Step 3 (background subagent, MCP-only) + Step 4a (Main, in-memory mutations). Pass `mcp_available` to Step 3 explicitly; Step 4a sends `expected_updated_at` and skips WFs already archived by Step 3.
+2. **Parallel phase A:** Step 3 (background subagent, MCP-only) + Step 4a (Main, in-memory mutations). Pass `mcp_available` to Step 3 explicitly; Step 4a sends `expected_updated_at` and skips WFs already archived by Step 3. Stale-sweep: subagent returns candidates ONLY — prompts happen in Main after phase A (see Step 3).
 3. **Main (synchronous):** Step 5 — `mx_create_doc(session_note)` issued from Main; subagent may build the body string but Main issues the call and captures the doc_id (skill runtime has no await-subagent primitive — running Step 5 in background would regress Bug#3229).
 4. **Main:** Step 4b — single deferred Write applying ALL 4a + 4b mutations (incl. `last_save_summary` + `last_save_session_note_doc_id` from Step 5's return).
 5. **Parallel phase B (fire-and-forget):** Step 6 Peer Notify — no join, errors logged not aborted.
@@ -39,6 +39,15 @@ Read+clean `.claude/settings.local.json`:
 - Bash(grep/find/ls/dir:*)→remove (Glob/Grep/Read exist)
 - Keep useful entries (WebSearch, WebFetch domains, python)
 - Sort logically: WebSearch→WebFetch→Bash
+- ⚡ Fail-soft: auto-mode permission classifier may DENY settings.local.json edits (even pure removals get classified as self-modification) → skip + report `Step 1 skipped — settings edit denied by classifier`, do NOT retry or escalate (observed live 2026-06-10)
+
+### 1b) Local Artifact Sweep (LOCAL, report-only)
+Scan workspace for stale local artifacts — REPORT only; any delete/refresh strictly confirm-gated (AskUserQuestion). Generic patterns only (project-specific paths belong in project docs, not here):
+- Superseded build/release artifacts: keep the newest ZIP + extracted-dir pair, list older ones (count+size)
+- `logs/` entries older than 14d (aggregate count+size only, no per-file listing)
+- `*.new` / `*.old-*` / `*.bak` leftovers from install/update scripts (repo root + bin dirs)
+- Mirrored-file timestamp drift: files maintained as copies in 2+ repo locations where the designated SOURCE is older than its mirror → report (downgrade risk on next copy; caught a stale proxy binary 2026-06-11)
+- Output: `Artifacts: <N> stale candidates (report-only)` — silent if 0. Missing dirs → skip silently. `--loop` mode: skip entire step.
 
 ### 2) Update CLAUDE.md + status.md (HYBRID — local + MCP for zombie check)
 **CLAUDE.md:**
@@ -80,9 +89,9 @@ Check WFs whose title starts with "Ad-hoc:":
     - Any item `confirmed_pending` → NOT stale (real work outstanding) → skip
     - All items `unverifiable` → skip (cannot determine, no false positive). !per-item output; when N>0 emit one aggregate line: `stale-sweep: N of M candidates unverifiable, skipped`
 - Build candidate list: `[{doc_id, title, doc_type, divergence_count, evidence, days_since_update}]`
-- ⚡ User-Prompt (sequential per item — tag is set ONLY on `skip` to avoid orphan-tag if user aborts mid-prompt):
+- ⚡ Subagent/Main split: when Step 3 runs as background subagent (Execution Mode phase A), the subagent performs DETECTION ONLY and returns the candidate list — subagents cannot prompt the user. Main re-checks each candidate against the FS-anchor skip rules (any `confirmed_pending` → reject as false positive) and prompts via AskUserQuestion, bundling up to 4 candidates per call (NOT N sequential prompts). Tag is set ONLY on `skip` to avoid orphan-tag if user aborts mid-prompt:
   - Show: `<type>#<id>: <title>` + `evidence: <path>` + `age: <D>d` + `(y=archive / n=ignore / skip=tag-for-next-session)`
-  - `y` → `mx_update_doc(doc_id, status='archived', change_reason='Pre-save stale sweep: code shipped, doc not flipped (internal FR/internal spec)')`
+  - `y` → `mx_update_doc(doc_id, status='archived', change_reason='Pre-save stale sweep: code shipped, doc not flipped (FR#7066/Spec#7070)')`
   - `n` → no-op (ignore for this session; no tag, no archive)
   - `skip` → `mx_add_tags(doc_id, ['stale-suspect'])` (idempotent — re-run silently if already tagged; persists for next-session review)
 - Output: `Stale-Sweep: <Y> archived, <I> ignored, <S> tagged-for-review (of <C> candidates)`
@@ -220,6 +229,7 @@ Constraints: !settings.local.json cleanup (manual only), !Prompts, !interactive 
 - ⚡ Session notes derived from chat, facts only !speculation. ∅info→"Open question"
 - !auto-create ADRs→suggest /mxDecision. !delete existing content→supplement/compact
 - Encoding: UTF-8 without BOM. Prefer MCP, local=fallback
+- ⚡ events_log append (Step 4a/4b): skip the append if identical to the current LAST entry (same type+wf+detail) — consecutive-duplicate guard (duplicate step_done observed 2026-06-10)
 - ⚡ Interactive questions (all `?user` prompts incl. stale-sweep y/n/skip)→AskUserQuestion tool. !freetext-numbered-prompts
 
 ## Completion
