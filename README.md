@@ -118,6 +118,7 @@ Claude: Recalls the plan, your progress, and relevant lessons
 ## Links
 
 - **[mxlore.dev](https://www.mxlore.dev)** — Product overview, features, comparison
+- **[Team Collaboration Guide](https://github.com/MicrotronX/mxLore/blob/main/docs/team-collaboration.md)** — How PM, Dev, QA & Doc work together through mxLore
 - **[MicrotronX/mxLore](https://github.com/MicrotronX/mxLore)** — Server source code
 - **[MicrotronX/mxLore-skills](https://github.com/MicrotronX/mxLore-skills)** — This repo
 
