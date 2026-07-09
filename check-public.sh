@@ -7,21 +7,26 @@
 # at all. As parenthetical provenance they are merely noise; in an actionable
 # form (`doc_id=NNN`) they are a live defect.
 #
-# The ~125 pre-existing occurrences are accepted as legacy baseline — rewriting
-# them wholesale would churn live skill instructions for cosmetic gain. This
-# guard only stops NEW ones from landing. Touching a legacy line makes it show
-# up here, which is the natural moment to clean that one line.
+# The repo carries no internal IDs any more — they were swept out on 2026-07-09,
+# together with the canonical ~/.claude sources they are copied from. So this
+# guard is now strict rather than incremental: `--all` must report zero, and any
+# newly added occurrence fails. The former "legacy baseline" exemption is gone;
+# it only ever existed because the backlog did.
 #
 #   ./check-public.sh                 # staged changes  (wire up as pre-commit)
 #   ./check-public.sh --range A..B    # a commit range  (wire up as CI step)
-#   ./check-public.sh --all           # full scan, prints the legacy baseline
+#   ./check-public.sh --all           # full scan, must report zero
 #
 # ADR-000N is intentionally NOT matched: those are public architecture decisions,
 # not MCP row IDs.
+#
+# The trailing \b keeps the pattern off CSS hex literals: `#2563eb` would
+# otherwise match on its leading four digits. Two-digit placeholders in worked
+# examples (`doc#12`, `ADR#12`) stay below the {3,5} floor by design.
 
 set -uo pipefail
 
-PATTERN='(#[0-9]{3,5}|doc_id=[0-9]{3,5})'
+PATTERN='(#[0-9]{3,5}\b|doc_id=[0-9]{3,5})'
 mode="${1:---staged}"
 
 # Content files only, and never this script itself — its help text quotes the
@@ -32,8 +37,12 @@ if [ "$mode" = "--all" ]; then
   hits=$(grep -rnE "$PATTERN" . --include='*.md' --include='*.json' \
            --exclude-dir=.git --exclude='check-public.sh' 2>/dev/null || true)
   n=$(printf '%s' "$hits" | grep -c . || true)
-  echo "legacy baseline: ${n} line(s) — exempt, not an error"
-  [ "$n" -gt 0 ] && printf '%s\n' "$hits"
+  if [ "$n" -gt 0 ]; then
+    echo "FAIL: ${n} internal ID(s) present (expected: 0)"
+    printf '%s\n' "$hits"
+    exit 1
+  fi
+  echo "OK: full scan clean — no internal IDs"
   exit 0
 fi
 
@@ -55,7 +64,7 @@ if [ -n "$hits" ]; then
   echo "  'regression of Spec#2152'      -> 'a known regression'"
   echo "  'Reference: doc_id=620 …'      -> name the convention, not the row"
   echo
-  echo "Legacy occurrences are exempt — see './check-public.sh --all'."
+  echo "Full scan: './check-public.sh --all' — it must report zero."
   exit 1
 fi
 
