@@ -154,12 +154,23 @@ entirely from output).
   mxSpec, mxDecision, mxMigrateToDb, mxInitProject]`. For each, call
   `mx_skill_metrics(skill=<name>, project=<slug>, days=90)`.
 - **Checks:**
-  - FP rate > 50% for a rule -> `WARNING("Rule {rule_id} has {fp_rate}%
-    false positives — mx_skill_manage(action='tune', ...) recommended")`.
+  - Rule accuracy: `Read ~/.claude/skills/_shared/skill-metrics-gate.md` —
+    SSoT for the gate condition (evidence floor, threshold, metric selection,
+    `0/0` handling, never-gate-on-`fp_rate` rule). Rule **gated** ->
+    `WARNING("Rule {rule_id}: low weighted precision — tune recommended")`,
+    with `weighted_precision` (a 0..1 quotient, not a percent) and `n` in the
+    finding DETAILS, never in the title — titles carrying run-varying numbers
+    defeat the Phase 3b title dedup and re-silt the DB every run (the same
+    silt pattern this gate exists to stop, one level up). Rule below the
+    evidence floor -> skip silently.
+  - ⚡ Keep the per-rule gate results from this check — Phase 3b/4 reuse them
+    for read-path suppression (same SSoT file, 0 extra MCP calls).
   - More than 20 pending findings -> `INFO("N findings awaiting feedback")`.
+    Since mxSave no longer batch-dismisses, a growing `pending` count is an
+    unreviewed-backlog signal, not noise.
   - No `skill_findings` table or error -> skip (feature not active for that
     skill).
-- **Severity:** `WARNING` (high FP) | `INFO` (pending).
+- **Severity:** `WARNING` (low weighted precision) | `INFO` (pending).
 - **Persistence:** Phase 3b note + Phase 4 bugreport for `WARNING` only.
 
 ## P14: AI-Batch Status

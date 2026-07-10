@@ -62,6 +62,9 @@ Read spec completely→apply spec-review.md rules→check technical feasibility
 ## Adversarial Verify (optional, on request or `--adversarial`)
 Each finding above INFO → 1 independent refuter-agent (parallel, prompt: 'Try to refute this finding with code proof'). Refuted → discard; partially refuted → downgrade severity. Output notes refuted-count. Costs ~1 agent/finding — use for release-gates or low-confidence runs.
 
+### Gate-check (before report, findings > 0 only)
+⚡ `Read ~/.claude/skills/_shared/skill-metrics-gate.md` (SSoT). One `mx_skill_metrics(skill='mxDesignChecker', project=<slug>)` call HERE — end of Analysis, before Phase 3 builds the report table. Calling it later (inside Phase 3b, after the table is already rendered) cannot annotate a table that has already been printed. Mark gated-rule findings for the Phase 3 table: append `⚠ low-precision rule` to their row.
+
 ## Phase 3: Report
 
 ```markdown
@@ -82,6 +85,7 @@ X CRITICAL | Y WARNING | Z INFO | **Not checked:** <irrelevant cats>
 
 ## Phase 3b: Persist findings (Skill Evolution)
 MCP available (Phase 1 mx_ping OK) AND Findings > 0:
+⚡ **Read-path gate:** annotation already applied to the Phase 3 table (see Gate-check step above, end of Phase 2). `record_finding` is NEVER suppressed — persist every finding regardless of gate state.
 For each finding: `mx_skill_manage(action='record_finding', skill='mxDesignChecker', rule_id='<cat-lowercase>', project='<slug>', severity='<sev-lowercase>', title='<finding summary>', file_path='<file>', line_number=<line>, context_hash='<file>:<line>', details='<code-proof + finding>')`
 ⚡ Issue record_finding calls in parallel (independent writes, single message multi-tool-call) !sequential one-by-one.
 
@@ -102,7 +106,7 @@ For each finding: `mx_skill_manage(action='record_finding', skill='mxDesignCheck
 
 After recording: `**Skill Evolution:** N findings persisted. Feedback: mx_skill_feedback(finding_uid='...', reaction='confirmed|dismissed|false_positive')`
 
-## Phase 4: Corrections + Auto-Confirm
+## Phase 4: Corrections + Verdicts
 ⚡ !automatic corrections — ALL require user confirmation
 1. CRITICAL→?user whether to apply fix+show concrete fix
 2. WARNING→list suggestions, user decides
@@ -110,18 +114,21 @@ After recording: `**Skill Evolution:** N findings persisted. Feedback: mx_skill_
 ∅Findings→`/mxDesignChecker: No issues in <N> categories. Design/code clean.`
 MCP: check active workflow→mention step completion
 
-### Auto-Confirm (⚡ MANDATORY after fix)
-Every finding that is fixed+accepted by user→immediately execute `mx_skill_feedback(finding_uid='...', reaction='confirmed')`.
-- Fix applied (Edit-Tool successful) → confirmed
-- User says "skip"/"don't fix" → no feedback (stays pending)
-- User says "wrong"/"incorrect" → `reaction='false_positive'`
-- ⚡ !wait for manual feedback step. !leave findings without confirm.
-- Caller (main context/mxOrchestrate) applying fixes outside the checker→MUST also send Auto-Confirm
+### Record Verdicts (⚡ MANDATORY — no finding leaves the run undecided)
+Read ~/.claude/skills/_shared/skill-verdicts.md — SSoT for what the three reactions mean.
+The user's call on each finding→immediately `mx_skill_feedback(finding_uid='...', reaction=<verdict>)`:
+- Fix applied (Edit-Tool successful) → `confirmed` (rule right, defect fixed)
+- User says "skip"/"don't fix"/"not worth it" → `dismissed` (rule right, nobody acts)
+- User says "wrong"/"incorrect" → `false_positive` (rule wrong, no defect existed)
+- ⚡ !route "won't fix" into `false_positive` — that turns `precision` into an effort ratio
+- ⚡ !invent a verdict the user did not state. Undecided→stays `pending` and gets reported, !silently dismissed
+- Caller (main context/mxOrchestrate) applying fixes outside the checker→MUST also record the verdict
 
 ### Pending-Review (optional, with `--review-pending` argument)
 1. `mx_skill_findings_list(project='<slug>', skill='mxDesignChecker', status='pending')` → load all open findings
-2. For each finding: check file:line whether issue still exists
-3. Fixed→`mx_skill_feedback(finding_uid, 'confirmed')` | Still open→skip | Irrelevant→`dismissed`
+2. For each finding: check file:line whether the issue still exists
+3. ⚡ Present finding + evidence, user picks the verdict. Re-adjudication is a PROPOSAL — !write a reaction on the checker's own findings without the user's word
+4. "Code changed" is no verdict by itself: defect was fixed→`confirmed` | defect stopped mattering→`dismissed`
 
 ## Rules
 - ⚡ !Finding without code-proof. !Assumptions("probably"). !Confirmation bias→"∅issues" is good

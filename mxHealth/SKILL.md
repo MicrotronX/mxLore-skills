@@ -77,7 +77,8 @@ X ERROR | Y WARNING | Z INFO | Checked: N DB docs, M local files
 ∅problems→`/mxHealth: All checks passed. DB+docs/ consistent.`
 
 ### Phase 3b: Persist Findings→MCP Notes
-For each finding with severity ERROR or WARNING:
+⚡ **Read-path gate first:** `Read ~/.claude/skills/_shared/skill-metrics-gate.md` (SSoT). Findings from **gated** rules (per-rule results already computed in P13, 0 extra MCP calls)→inline only, skip Note here AND exclude from Phase 4 bugreport. `record_finding` (below) still runs for them.
+For each remaining finding with severity ERROR or WARNING:
 1. Deduplication: mx_search(project, doc_type='note', query='[Health] <title>', limit=1)
    - Match with same title→skip
 2. mx_create_doc(project, doc_type='note', title='[Health] <finding-title>', content='Severity: <sev>\n<details>\nFound: YYYY-MM-DD', tags=["health-finding","<severity-tag>"])
@@ -91,12 +92,14 @@ For each finding with severity ERROR or WARNING:
 - Project-specific findings (stubs, local docs, missing relations)→`project=<target-project>`
 `mx_create_doc(project=<see routing>, doc_type='bugreport', title='mxHealth: N Findings...', tags=["mxhealth-auto"], status='reported')`
 Deduplication: mx_search before creating. ∅ERROR/WARNING→no report.
+⚡ Gated-rule findings (Phase 3b gate, `_shared/skill-metrics-gate.md`) are excluded — all findings gated→no bugreport at all.
 
 ⚡ Tags param contract (Phase 3b + Phase 4): `Read ~/.claude/skills/_shared/mcp-tags-array.md.`
 
 **Skill Evolution:** For each finding (ERROR+WARNING): `mx_skill_manage(action='record_finding', skill='mxHealth', rule_id='<pN-lowercase>' (e.g. p1-metadata, p3-crossref, p4-status), project='<slug>', severity='<error|warning>', title='<finding summary>', details='<document + finding>')`
 - context_hash='<check>:<document-slug>' for dedup across runs
 - ∅MCP→skip (already captured in bugreport)
+- ⚡ **Record the verdict too.** Read `~/.claude/skills/_shared/skill-verdicts.md` (SSoT). Recording a finding without ever recording the user's call leaves it `pending` forever, and `precision` for that rule stays `0/0` — the server renders that as `0.0`, indistinguishable from "always wrong". Fixed→`confirmed` | user declines→`dismissed` | user says the check misread→`false_positive` | user never ruled→`pending` (report it, !dismiss it)
 
 ## Phase 5: Auto-Fix (P9)
 P9 findings→removed (B6.5). ∅P9→skip.
