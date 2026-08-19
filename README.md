@@ -11,7 +11,7 @@ AI-powered development workflows for [Claude Code](https://claude.ai/claude-code
 
 | Skill | What it does |
 |-------|-------------|
-| **`/mxOrchestrate`** | Session orchestrator. Manages workflow stacks, ad-hoc tasks, team agents. Tracks what you're working on across sessions. |
+| **`/mxOrchestrate`** | Session orchestrator. Manages workflow stacks, ad-hoc tasks, team agents. Tracks what you're working on across sessions, and arms an inbox watcher so an incoming agent message wakes the session even while it sits idle. |
 | **`/mxSave`** | Persist everything. Session notes, lessons learned, state sync. Run before closing Claude Code. |
 | **`/mxPlan`** | Create structured implementation plans with milestones, tasks, and dependencies. |
 | **`/mxSpec`** | Write specifications with acceptance criteria, constraints, and design decisions. |
