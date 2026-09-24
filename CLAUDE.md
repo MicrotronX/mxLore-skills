@@ -75,6 +75,7 @@ delphi→~/.claude/reference/delphi.md | php/web→~/.claude/reference/php-web.m
 docs/reference/=on-demand. mx*-skills→auto-generate !manual-create
 
 ## Superpowers→mx* Bridge (mx* priority in docs/-projects)
+superpowers=optional plugin(install:/mxSetup --with-superpowers). mx*-skills work fully without it; if installed it adds rigor + skills may use it. !hard-fail on missing superpowers skill
 writing-plans→/mxPlan | brainstorming→/mxPlan+/mxSpec+/mxDecision→/mxDesignChecker
 verification/finishing→/mxSave | executing→/mxDecision+/mxDesignChecker | session-end→/mxSave
 <!-- mx-rules-end -->
