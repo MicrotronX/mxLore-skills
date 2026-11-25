@@ -11,7 +11,7 @@ AI-powered development workflows for [Claude Code](https://claude.ai/claude-code
 
 | Skill | What it does |
 |-------|-------------|
-| **`/mxOrchestrate`** | Session orchestrator. Manages workflow stacks, ad-hoc tasks, team agents. Tracks what you're working on across sessions, and arms an inbox watcher so an incoming agent message wakes the session even while it sits idle. |
+| **`/mxOrchestrate`** | Session orchestrator. Manages workflow stacks, ad-hoc tasks, team agents. Tracks what you're working on across sessions. Incoming agent messages reach the session through the local proxy, also while it sits idle. |
 | **`/mxSave`** | Persist everything. Session notes, lessons learned, state sync. Run before closing Claude Code. |
 | **`/mxPlan`** | Create structured implementation plans with milestones, tasks, and dependencies. |
 | **`/mxSpec`** | Write specifications with acceptance criteria, constraints, and design decisions. |
@@ -24,6 +24,8 @@ AI-powered development workflows for [Claude Code](https://claude.ai/claude-code
 | **`/mxDesignChecker`** | Review code and designs against specs. Finds inconsistencies, missing error handling, architectural violations. |
 | **`/mxBugChecker`** | Find bugs with proof. Every finding requires a code reference — no false positives from guessing. |
 | **`/mxHealth`** | Knowledge DB consistency checks. Finds stale docs, orphaned relations, broken summaries. |
+| **`/mxKnowledge`** | Component and library dossiers. Retrieves what the knowledge DB knows about a reusable component, tool or third-party library, and creates a dossier when a repeatedly-consulted one has none. |
+| **`/mxHelp`** | Lists all installed mx* skills grouped by category, or explains one in detail. Read-only. |
 
 ### Setup & Migration
 
@@ -35,7 +37,7 @@ AI-powered development workflows for [Claude Code](https://claude.ai/claude-code
 
 ## Quick Start
 
-### Option A: Via mxSetup (recommended, ~30 seconds)
+### Option A: Via mxSetup (recommended, ~15 seconds)
 
 1. Set up your [mxLore server](https://github.com/MicrotronX/mxLore) first
 2. Download the setup skill:
@@ -61,6 +63,7 @@ Clone this repo and copy skills to your Claude Code config:
 ```bash
 git clone https://github.com/MicrotronX/mxLore-skills.git
 cp -r mxLore-skills/mx* ~/.claude/skills/
+cp -r mxLore-skills/_shared ~/.claude/skills/
 cp -r mxLore-skills/hooks/* ~/.claude/hooks/
 cp -r mxLore-skills/reference/* ~/.claude/reference/
 ```
@@ -80,7 +83,9 @@ mxDecision/            — ADR documentation
 mxDesignChecker/       — Code & design review
   rules/               — Review rules (Delphi, web, general, spec)
 mxHealth/              — Knowledge DB health checks
+mxHelp/                — Skill overview and help
 mxInitProject/         — Project bootstrapping
+mxKnowledge/           — Component and library dossiers
 mxMigrateToDb/         — Local-to-MCP migration
 mxOrchestrate/         — Session orchestrator
   workflows.md         — Workflow templates
@@ -88,8 +93,10 @@ mxPlan/                — Implementation planning
 mxSave/                — Session persistence
 mxSetup/               — Developer onboarding
 mxSpec/                — Specification writing
-hooks/                 — 8 automation hooks (recall gate, orchestration, agent inbox)
-reference/             — Delphi, PHP/web, encoding guides
+_shared/               — Shared rule files the skills read (installed to ~/.claude/skills/_shared)
+hooks/                 — 9 automation hooks + 1 notes file (recall gate, orchestration, env guard, status line)
+reference/             — Delphi, PHP/web, encoding guides + MCP tools reference
+setup-version.json     — Skills release version
 ```
 
 ## How Skills Work
@@ -114,6 +121,8 @@ Claude: Recalls the plan, your progress, and relevant lessons
 - [mxLore MCP Server](https://github.com/MicrotronX/mxLore) (self-hosted)
 - [Claude Code](https://claude.ai/claude-code) CLI or IDE extension
 - MariaDB 10.6+
+- [Node.js](https://nodejs.org/) for the hooks (7 of the 9 are Node scripts; without it the skills still work, but state tracking and the recall gate stay silent)
+- An API key — created in the mxLore server's Admin UI (<http://localhost:8081>)
 
 ## Links
 
@@ -124,4 +133,4 @@ Claude: Recalls the plan, your progress, and relevant lessons
 
 ## License
 
-Same as [mxLore](https://github.com/MicrotronX/mxLore/blob/main/LICENSE.txt) — BSL 1.1. Non-commercial production use is free.
+The skills are released under the MIT License (see [LICENSE.txt](LICENSE.txt)). The [mxLore server](https://github.com/MicrotronX/mxLore/blob/main/LICENSE.txt) is licensed under BSL 1.1.
